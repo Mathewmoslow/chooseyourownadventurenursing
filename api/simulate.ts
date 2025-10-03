@@ -10,34 +10,31 @@ const requestSchema = z.object({
 });
 
 const parseRequestBody = (req: VercelRequest): unknown => {
-  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
-    return req.body;
-  }
-
-  const rawBuffer = Buffer.isBuffer(req.body)
-    ? req.body
-    : typeof req.body === 'string'
-      ? Buffer.from(req.body)
-      : // @ts-expect-error – rawBody is available in the Node runtime but not typed
-        Buffer.isBuffer(req.rawBody)
-        ? // @ts-expect-error – see above
-          (req.rawBody as Buffer)
-        : null;
-
-  if (!rawBuffer) {
+  if (req.body === undefined || req.body === null) {
     return {};
   }
 
-  const raw = rawBuffer.toString('utf8').trim();
-  if (!raw) {
-    return {};
+  if (typeof req.body === 'string') {
+    const trimmed = req.body.trim();
+    if (!trimmed) return {};
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      throw new Error('INVALID_JSON');
+    }
   }
 
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error('INVALID_JSON');
+  if (Buffer.isBuffer(req.body)) {
+    const text = req.body.toString('utf8').trim();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('INVALID_JSON');
+    }
   }
+
+  return req.body;
 };
 
 const withCors = (res: VercelResponse) => {
