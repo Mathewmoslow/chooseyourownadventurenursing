@@ -35,8 +35,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const rawBody =
-      typeof req.body === 'string' ? JSON.parse(req.body) : req.body ?? {};
+    const bodySource = (() => {
+      if (typeof req.body === 'string') {
+        return req.body;
+      }
+      if (Buffer.isBuffer(req.body)) {
+        return req.body.toString('utf8');
+      }
+      if (req.body) {
+        return req.body;
+      }
+      return '{}';
+    })();
+
+    const rawBody = typeof bodySource === 'string' ? JSON.parse(bodySource || '{}') : bodySource;
+
     const parsed = requestSchema.parse(rawBody);
     const existingState = getStateFromToken(parsed.token);
 
