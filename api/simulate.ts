@@ -9,6 +9,37 @@ const requestSchema = z.object({
   token: z.string().optional(),
 });
 
+const parseRequestBody = (req: VercelRequest): unknown => {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+
+  const rawBuffer = Buffer.isBuffer(req.body)
+    ? req.body
+    : typeof req.body === 'string'
+      ? Buffer.from(req.body)
+      : // @ts-expect-error – rawBody is available in the Node runtime but not typed
+        Buffer.isBuffer(req.rawBody)
+        ? // @ts-expect-error – see above
+          (req.rawBody as Buffer)
+        : null;
+
+  if (!rawBuffer) {
+    return {};
+  }
+
+  const raw = rawBuffer.toString('utf8').trim();
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error('INVALID_JSON');
+  }
+};
+
 const withCors = (res: VercelResponse) => {
   const allowedOrigin = process.env.ALLOWED_ORIGIN || '*';
   res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
@@ -35,21 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const bodySource = (() => {
-      if (typeof req.body === 'string') {
-        return req.body;
-      }
-      if (Buffer.isBuffer(req.body)) {
-        return req.body.toString('utf8');
-      }
-      if (req.body) {
-        return req.body;
-      }
-      return '{}';
-    })();
-
-    const rawBody = typeof bodySource === 'string' ? JSON.parse(bodySource || '{}') : bodySource;
-
+    const rawBody = parseRequestBody(req);
     const parsed = requestSchema.parse(rawBody);
     const existingState = getStateFromToken(parsed.token);
 
@@ -58,7 +75,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json({ state: publicState, token, logEntry });
   } catch (error) {
-    console.error(error);
-    res.status(400).json({ error: 'Invalid request' });
+    const isInvalidJson = (error as Error)?.message === 'INVALID_JSON';
+    if (!isInvalidJson) {
+      console.error(error);
+    }
+    res
+      .status(isInvalidJson ? 400 : 500)
+      .json({ error: isInvalidJson ? 'Request body must be valid JSON' : 'Server error' });
   }
 }
