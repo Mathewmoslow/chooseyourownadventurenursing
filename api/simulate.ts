@@ -50,6 +50,7 @@ const getStateFromToken = (token: string | undefined): SimulationState | undefin
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('simulate handler start', { method: req.method, hasBody: req.body !== undefined });
   withCors(res);
 
   if (req.method === 'OPTIONS') {
@@ -64,6 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const rawBody = parseRequestBody(req);
+    console.log('parsed body', rawBody);
     const parsed = requestSchema.parse(rawBody);
     const existingState = getStateFromToken(parsed.token);
 
@@ -72,6 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json({ state: publicState, token, logEntry });
   } catch (error) {
+    console.error('simulate handler error', error);
     const isInvalidJson = (error as Error)?.message === 'INVALID_JSON';
     if (!isInvalidJson) {
       console.error(error);
