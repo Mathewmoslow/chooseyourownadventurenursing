@@ -1,0 +1,68 @@
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: rgba(13, 36, 66, 0.7);
+  border: 1px solid rgba(126, 174, 240, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.banner[data-tone='stabilized'] {
+  background: rgba(24, 68, 54, 0.68);
+  border-color: rgba(88, 208, 178, 0.4);
+}
+
+.banner[data-tone='died'] {
+  background: rgba(74, 20, 20, 0.72);
+  border-color: rgba(255, 112, 112, 0.4);
+}
+
+.banner strong {
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(232, 242, 255, 0.9);
+}
+
+.banner p {
+  margin: 0;
+  color: rgba(198, 214, 246, 0.82);
+  font-size: 0.92rem;
+}
+
+.banner[data-tone='stabilized'] p {
+  color: rgba(201, 245, 229, 0.86);
+}
+
+.banner[data-tone='died'] p {
+  color: rgba(255, 196, 196, 0.86);
+}
+
+.pulse {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(126, 174, 240, 0.18), transparent 65%);
+  animation: pulse 4s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.8;
+  }
+}
+
+.banner > *:not(.pulse) {
+  position: relative;
+  z-index: 1;
+}
+
