@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { advanceSimulation } from '../server/src/engine';
-import { decodeState, encodeState } from '../server/src/signing';
-import type { SimulationState } from '../server/src/types';
+import { advanceSimulation } from './_lib/engine';
+import { decodeState, encodeState } from './_lib/signing';
+import type { SimulationState } from './_lib/types';
 
 const requestSchema = z.object({
   action: z.string().max(280).optional(),
@@ -50,7 +50,6 @@ const getStateFromToken = (token: string | undefined): SimulationState | undefin
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log('simulate handler start', { method: req.method, hasBody: req.body !== undefined });
   withCors(res);
 
   if (req.method === 'OPTIONS') {
@@ -65,7 +64,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const rawBody = parseRequestBody(req);
-    console.log('parsed body', rawBody);
     const parsed = requestSchema.parse(rawBody);
     const existingState = getStateFromToken(parsed.token);
 
@@ -74,8 +72,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json({ state: publicState, token, logEntry });
   } catch (error) {
-    console.error('simulate handler error', error);
     const isInvalidJson = (error as Error)?.message === 'INVALID_JSON';
+    if (!isInvalidJson) {
+      console.error(error);
+    }
     if (!isInvalidJson) {
       console.error(error);
     }

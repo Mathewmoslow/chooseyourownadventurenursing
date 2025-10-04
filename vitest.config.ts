@@ -11,7 +11,6 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
     },
     environmentMatchGlobs: [
-      ['server/**', 'node'],
       ['api/**', 'node'],
     ],
   },
