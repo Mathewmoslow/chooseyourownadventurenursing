@@ -2,6 +2,7 @@ import { clamp } from './utils.js';
 import { createInitialState, cloneState } from './state.js';
 import type { ActionContext, ActionHandler, ActionLogEntry, PublicState, SimulationState } from './types.js';
 import { parseActionWithAI } from './ai-parser.js';
+import { generateDynamicNarration } from './ai-narrator.js';
 
 const waitActionId = 'WAIT';
 
@@ -145,24 +146,33 @@ const updateClinicalPresentation = (state: SimulationState) => {
   const pressorActive = state.infusions.pressor.active;
   const antibioticActive = state.infusions.antibiotic.active;
 
-  const mapBase = 76 - 0.2 * s + (fluidsActive ? 3 : 0) + (pressorActive ? 8 : 0);
+  // MORE DRAMATIC fluid/pressor response - these should work IMMEDIATELY
+  const fluidBoost = fluidsActive ? 8 : 0; // Increased from 3
+  const pressorBoost = pressorActive ? 15 : 0; // Increased from 8
+
+  const mapBase = 76 - 0.2 * s + fluidBoost + pressorBoost;
   state.vitals.map = parseFloat(clamp(mapBase, 45, 85).toFixed(1));
   state.vitals.systolic = Math.round(state.vitals.map + 16);
   state.vitals.diastolic = Math.max(38, Math.round(state.vitals.map - 10));
 
-  const hrModifier = (pressorActive ? -5 : 0) + (antibioticActive ? -3 : 0);
+  // More dramatic HR response to interventions
+  const hrModifier = (pressorActive ? -10 : 0) + (antibioticActive ? -8 : 0) + (fluidsActive ? -5 : 0);
   state.vitals.heartRate = Math.round(clamp(100 + 0.7 * s + hrModifier, 80, 160));
 
-  const tempModifier = antibioticActive ? -0.4 : 0;
+  // Faster temp response to antibiotics
+  const tempModifier = antibioticActive ? -0.8 : 0; // Doubled from -0.4
   state.vitals.temperatureC = parseFloat(clamp(37 + 0.055 * s + tempModifier, 36.3, 40.5).toFixed(1));
 
   state.vitals.respiratoryRate = Math.round(clamp(18 + 0.15 * s, 16, 36));
 
-  const spo2Modifier = (fluidsActive ? 0.5 : 0) + (state.labs.hgb >= 7 ? 0.3 : -0.7);
+  // Better oxygenation response
+  const spo2Modifier = (fluidsActive ? 1.2 : 0) + (state.labs.hgb >= 7 ? 0.8 : -0.7);
   state.vitals.spo2 = parseFloat(clamp(96 - 0.05 * s + spo2Modifier, 88, 99).toFixed(1));
 
+  // More responsive lactate clearance with fluids
+  const lactateReduction = fluidsActive ? 0.12 * Math.min(20, s) : 0; // Tripled effectiveness
   state.vitals.lactate = parseFloat(
-    clamp(1.8 + 0.05 * s - (fluidsActive ? 0.04 * Math.min(20, s) : 0), 1.4, 6.1).toFixed(1),
+    clamp(1.8 + 0.05 * s - lactateReduction, 1.4, 6.1).toFixed(1),
   );
 
   if (s >= 80) {
@@ -441,6 +451,7 @@ export const advanceSimulation = async (
   }
 
   const state = cloneState(existingState);
+  const previousState = cloneState(existingState); // Save for comparison
 
   const normalized = actionText ? normalizeAction(actionText) : '';
 
@@ -474,52 +485,72 @@ export const advanceSimulation = async (
 
   handler.execute(state, ctx);
   const timeNotices = advanceTime(state, ctx.minutesConsumed);
-  const notices = [...ctx.notices, ...timeNotices];
 
-  const narrationPieces: string[] = [];
-  switch (handler.id) {
-    case 'ANTIBIOTIC':
-      narrationPieces.push('Broad antimicrobial coverage starts flowing.');
-      break;
-    case 'FLUID_BOLUS':
-      narrationPieces.push('Crystalloid bolus chases the hypotension.');
-      break;
-    case 'PRBC':
-      narrationPieces.push('Packed red cells begin to run.');
-      break;
-    case 'PLATELETS':
-      narrationPieces.push('Platelets infuse cautiously while you monitor for reactions.');
-      break;
-    case 'PRESSOR':
-      narrationPieces.push('Pressor initiated to maintain perfusion.');
-      break;
-    case 'STOP_PRESSOR':
-      narrationPieces.push('Pressor tapered as pressures sustain.');
-      break;
-    case 'CULTURES':
-      narrationPieces.push('Cultures obtained without delaying therapy.');
-      break;
-    case 'RAPID_RESPONSE':
-      narrationPieces.push('Critical care backup is mobilized.');
-      break;
-    case 'CHECK_VITALS':
-      narrationPieces.push('Focused reassessment performed.');
-      break;
-    case waitActionId:
-      narrationPieces.push('Moments pass while you observe the trend.');
-      break;
-    default:
-      if (handler.id === 'UNKNOWN') {
-        narrationPieces.push('Unclear intervention—clinical trajectory worsens with inaction.');
-      } else {
-        narrationPieces.push('Intervention carried out.');
-      }
+  // Try AI narration for dynamic responses
+  let aiNarration = await generateDynamicNarration(
+    handler.id,
+    actionText ?? '',
+    state,
+    previousState
+  );
+
+  const notices = aiNarration.notices.length > 0
+    ? [...aiNarration.notices, ...timeNotices]
+    : [...ctx.notices, ...timeNotices];
+
+  // Use AI narration if available, otherwise use fallback
+  let finalNarration = '';
+
+  if (aiNarration.narration) {
+    finalNarration = aiNarration.narration;
+  } else {
+    // Fallback narration
+    const narrationPieces: string[] = [];
+    switch (handler.id) {
+      case 'ANTIBIOTIC':
+        narrationPieces.push('Broad antimicrobial coverage starts flowing.');
+        break;
+      case 'FLUID_BOLUS':
+        narrationPieces.push('Crystalloid bolus chases the hypotension.');
+        break;
+      case 'PRBC':
+        narrationPieces.push('Packed red cells begin to run.');
+        break;
+      case 'PLATELETS':
+        narrationPieces.push('Platelets infuse cautiously while you monitor for reactions.');
+        break;
+      case 'PRESSOR':
+        narrationPieces.push('Pressor initiated to maintain perfusion.');
+        break;
+      case 'STOP_PRESSOR':
+        narrationPieces.push('Pressor tapered as pressures sustain.');
+        break;
+      case 'CULTURES':
+        narrationPieces.push('Cultures obtained without delaying therapy.');
+        break;
+      case 'RAPID_RESPONSE':
+        narrationPieces.push('Critical care backup is mobilized.');
+        break;
+      case 'CHECK_VITALS':
+        narrationPieces.push('Focused reassessment performed.');
+        break;
+      case waitActionId:
+        narrationPieces.push('Moments pass while you observe the trend.');
+        break;
+      default:
+        if (handler.id === 'UNKNOWN') {
+          narrationPieces.push('Unclear intervention—clinical trajectory worsens with inaction.');
+        } else {
+          narrationPieces.push('Intervention carried out.');
+        }
+    }
+    finalNarration = narrationPieces.join(' ');
   }
 
   const actionLog: ActionLogEntry = {
     atMinute: state.elapsedMinutes,
     action: actionText ?? '...',
-    narration: narrationPieces.join(' '),
+    narration: finalNarration,
     notices,
   };
 
