@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import type { SimulationState } from './types';
+import type { SimulationState } from './types.js';
 
 const SECRET_ENV_KEY = 'SIM_SIGNATURE_SECRET';
 const DEV_FALLBACK = 'choose-your-own-adventure-dev-secret-key';

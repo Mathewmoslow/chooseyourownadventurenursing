@@ -1,4 +1,4 @@
-import type { InfusionState, Infusions, Labs, ResourceState, SimulationState, Vitals } from './types';
+import type { InfusionState, Infusions, Labs, ResourceState, SimulationState, Vitals } from './types.js';
 
 const infusion = (): InfusionState => ({
   active: false,

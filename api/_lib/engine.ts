@@ -1,12 +1,14 @@
-import { clamp } from './utils';
-import { createInitialState, cloneState } from './state';
-import type { ActionContext, ActionHandler, ActionLogEntry, PublicState, SimulationState } from './types';
+import { clamp } from './utils.js';
+import { createInitialState, cloneState } from './state.js';
+import type { ActionContext, ActionHandler, ActionLogEntry, PublicState, SimulationState } from './types.js';
+import { parseActionWithAI } from './ai-parser.js';
 
 const waitActionId = 'WAIT';
 
 const normalizeAction = (action: string) => action.trim().toLowerCase();
 
 const baseHandlers: ActionHandler[] = [];
+const handlersById = new Map<string, ActionHandler>();
 
 const findHandler = (normalized: string): ActionHandler | null => {
   for (const handler of baseHandlers) {
@@ -15,6 +17,10 @@ const findHandler = (normalized: string): ActionHandler | null => {
     }
   }
   return null;
+};
+
+const findHandlerById = (id: string): ActionHandler | null => {
+  return handlersById.get(id) ?? null;
 };
 
 const advanceTime = (state: SimulationState, minutes: number): string[] => {
@@ -197,6 +203,7 @@ const updateClinicalPresentation = (state: SimulationState) => {
 
 const registerHandler = (handler: ActionHandler) => {
   baseHandlers.push(handler);
+  handlersById.set(handler.id, handler);
 };
 
 registerHandler({
@@ -412,10 +419,10 @@ const toPublicState = (state: SimulationState): PublicState => ({
   log: [...state.log],
 });
 
-export const advanceSimulation = (
+export const advanceSimulation = async (
   actionText: string | null,
   existingState?: SimulationState,
-): { state: SimulationState; publicState: PublicState; logEntry: ActionLogEntry } => {
+): Promise<{ state: SimulationState; publicState: PublicState; logEntry: ActionLogEntry }> => {
   if (!existingState) {
     const fresh = createInitialState();
     return {
@@ -436,7 +443,27 @@ export const advanceSimulation = (
   const state = cloneState(existingState);
 
   const normalized = actionText ? normalizeAction(actionText) : '';
-  const handler = normalized ? findHandler(normalized) ?? unknownActionHandler : unknownActionHandler;
+
+  // Try AI parsing first, then fall back to regex
+  let handler: ActionHandler | null = null;
+
+  if (actionText && actionText.trim()) {
+    // Try AI first
+    const aiActionId = await parseActionWithAI(actionText);
+    if (aiActionId !== 'UNKNOWN') {
+      handler = findHandlerById(aiActionId);
+    }
+
+    // Fall back to regex if AI didn't find a match
+    if (!handler) {
+      handler = findHandler(normalized);
+    }
+  }
+
+  // Use unknown handler if nothing matched
+  if (!handler) {
+    handler = unknownActionHandler;
+  }
 
   const ctx: ActionContext = {
     actionText: actionText ?? '...',

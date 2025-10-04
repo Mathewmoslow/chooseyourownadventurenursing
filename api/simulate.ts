@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { advanceSimulation } from './_lib/engine';
-import { decodeState, encodeState } from './_lib/signing';
-import type { SimulationState } from './_lib/types';
+import { advanceSimulation } from './_lib/engine.js';
+import { decodeState, encodeState } from './_lib/signing.js';
+import type { SimulationState } from './_lib/types.js';
 
 const requestSchema = z.object({
   action: z.string().max(280).optional(),
@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = requestSchema.parse(rawBody);
     const existingState = getStateFromToken(parsed.token);
 
-    const { state, publicState, logEntry } = advanceSimulation(parsed.action ?? null, existingState);
+    const { state, publicState, logEntry } = await advanceSimulation(parsed.action ?? null, existingState);
     const token = encodeState(state);
 
     res.status(200).json({ state: publicState, token, logEntry });
