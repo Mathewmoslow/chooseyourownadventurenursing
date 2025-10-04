@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { SimulationState, ActionLogEntry } from './types.js';
+import type { SimulationState } from './types.js';
 
 const getOpenAIClient = () => {
   const apiKey = process.env.OPENAI_API_KEY;
