@@ -39,15 +39,18 @@ export const InterventionsPanel = ({ infusions, resources, flags }: Intervention
     { label: 'Rapid response', value: flags.rapidResponseCalled ? 'Mobilized' : 'On standby' },
   ];
 
+  const activeInfusions = infusionEntries.filter((item) => item.active);
+  const hasActiveInfusions = activeInfusions.length > 0;
+
   return (
-    <GlassCard title="Interventions & Logistics">
+    <GlassCard title="Active Interventions" subtitle={hasActiveInfusions ? `💉 ${activeInfusions.length} running` : '⏸️ No infusions'}>
       <div className={styles.section}>
         <h3>Infusions</h3>
         <ul>
           {infusionEntries.map((item) => (
-            <li key={item.label} data-active={item.active}>
+            <li key={item.label} data-active={item.active} className={item.active ? styles.active : styles.inactive}>
               <span>{item.label}</span>
-              <strong>{item.active ? formatRemaining(item.remaining) : 'Stopped'}</strong>
+              <strong>{item.active ? formatRemaining(item.remaining) : '—'}</strong>
             </li>
           ))}
         </ul>
@@ -64,7 +67,7 @@ export const InterventionsPanel = ({ infusions, resources, flags }: Intervention
         </ul>
       </div>
       <div className={styles.section}>
-        <h3>Team Signals</h3>
+        <h3>Team & Escalation</h3>
         <ul>
           {flagItems.map((item) => (
             <li key={item.label}>

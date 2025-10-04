@@ -97,8 +97,10 @@ export const SimulatorPage = () => {
         </div>
         <div className={styles.rightColumn}>
           <OutcomeBanner outcome={state?.outcome ?? 'ongoing'} />
-          {state && <LogTimeline log={state.log} isPending={status.isMutating} />}
-          <GlassCard title="Action Console" subtitle="Free-text commands only—no multiple choice">
+          <GlassCard title="Patient Response Log" subtitle="📝 Real-time feedback">
+            {state && <LogTimeline log={state.log} isPending={status.isMutating} />}
+          </GlassCard>
+          <GlassCard title="Action Console" subtitle="💬 Type your interventions">
             <CommandConsole
               onSubmit={(command) => sendAction(command)}
               disabled={disabled || Boolean(status.error)}
